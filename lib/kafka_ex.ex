@@ -290,6 +290,33 @@ defmodule KafkaEx do
     send(worker_name, :stop_streaming)
   end
 
+  defp broker_list do
+    case Application.get_env(:kafka_ex, :brokers) do
+      {:system, "FILE"} -> get_bp2_config
+      val -> val
+    end
+  end
+
+  defp get_bp2_config do
+    case File.read "/bp2/log/sbi_hooks.log" do
+      {:ok, file} -> ips = Regex.scan(~r/\[.*?]/,file)
+                            |> Enum.map(&Regex.scan(~r/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/, List.to_string(&1)))
+                            |> List.last
+                            |> List.flatten
+
+                     ports = Regex.scan(~r/\[.*?]/,file)
+                            |> Enum.map(&Regex.scan(~r/"port"\s*:\s*"[0-9]{4}"/, List.to_string(&1)))
+                            |> List.last
+                            |> Enum.map(&Regex.scan(~r/[0-9]{4}/,List.to_string(&1)))
+                            |> List.flatten
+                            |> Enum.map(&String.to_integer(&1))
+                     IO.inspect Enum.zip(ips,ports)
+      :error ->
+        IO.puts "sbi_hooks.log file missing reverting to default ip"
+        [{"192.168.0.1", 9092}]
+    end
+  end
+
   defp build_worker_options(worker_init) do
     defaults = [uris: broker_list,
                 consumer_group: Application.get_env(:kafka_ex, :consumer_group)]
@@ -301,30 +328,6 @@ defmodule KafkaEx do
     else
       {:error, :invalid_consumer_group}
     end
-  end
-
-  defp broker_list do
-    case Application.get_env(:kafka_ex, :brokers) do
-      {:system, "FILE"} -> get_bp2_config
-      val -> val
-    end
-  end
-
-  defp get_bp2_config do
-    {:ok, file} = File.read "/bp2/log/sbi_hooks.log"
-    ips = Regex.scan(~r/\[.*?]/,file)
-      |> Enum.map(&Regex.scan(~r/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/, List.to_string(&1)))
-      |> List.last
-      |> List.flatten
-
-    IO.inspect ports = Regex.scan(~r/\[.*?]/,file)
-      |> Enum.map(&Regex.scan(~r/"port"\s*:\s*"[0-9]{4}"/, List.to_string(&1)))
-      |> List.last
-      |> Enum.map(&Regex.scan(~r/[0-9]{4}/,List.to_string(&1)))
-      |> List.flatten
-      |> Enum.map(&String.to_integer(&1))
-
-    IO.inspect Enum.zip(ips,ports)
   end
 
   @doc """
