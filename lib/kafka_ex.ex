@@ -441,7 +441,7 @@ defmodule KafkaEx do
 
   defp build_worker_options(worker_init) do
     defaults = [
-      uris: Application.get_env(:kafka_ex, :brokers),
+      uris: broker_list,
       consumer_group: Application.get_env(:kafka_ex, :consumer_group),
       use_ssl: Config.use_ssl(),
       ssl_options: Config.ssl_options(),
